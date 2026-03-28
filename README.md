@@ -2,6 +2,20 @@
 
 Local web dashboard for reviewing and moderating events stored in a strfry relay.
 
+## Screenshots
+
+### Overview and relay summary
+
+![Overview and relay summary](docs/screenshot-01.png)
+
+### Review workflow and event inspection
+
+![Review workflow and event inspection](docs/screenshot-02.png)
+
+### Moderation and cleanup actions
+
+![Moderation and cleanup actions](docs/screenshot-03.png)
+
 ## What it does
 
 - Shows summary counters for the current relay database state.
