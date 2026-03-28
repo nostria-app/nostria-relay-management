@@ -191,6 +191,14 @@ function readTextareaList(value) {
     .filter(Boolean);
 }
 
+function readNumberList(value) {
+  return readTextareaList(value).map(function (item) {
+    return Number(item);
+  }).filter(function (item) {
+    return Number.isInteger(item) && item >= 0;
+  });
+}
+
 async function refreshHealth() {
   const health = await apiRequest('/api/health');
   document.getElementById('healthStatus').textContent = health.ok ? 'Backend connected' : 'Backend unavailable';
@@ -233,6 +241,15 @@ async function handleAuthorsDelete(event) {
   const formData = new FormData(event.currentTarget);
   await postJson('/api/moderation/delete-by-authors', {
     authors: readTextareaList(formData.get('authors')),
+    dryRun: formData.get('dryRun') === 'on'
+  });
+}
+
+async function handleKindsDelete(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  await postJson('/api/moderation/delete-by-kinds', {
+    kinds: readNumberList(formData.get('kinds')),
     dryRun: formData.get('dryRun') === 'on'
   });
 }
@@ -308,6 +325,7 @@ function bindEventSelection() {
 function wireForms() {
   reviewForm.addEventListener('submit', loadEvents);
   document.getElementById('authorsDeleteForm').addEventListener('submit', handleAuthorsDelete);
+  document.getElementById('kindsDeleteForm').addEventListener('submit', handleKindsDelete);
   document.getElementById('contentDeleteForm').addEventListener('submit', handleContentDelete);
   document.getElementById('ageDeleteForm').addEventListener('submit', handleAgeDelete);
   document.getElementById('filterDeleteForm').addEventListener('submit', handleFilterDelete);

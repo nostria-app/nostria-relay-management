@@ -7,7 +7,7 @@ Local web dashboard for reviewing and moderating events stored in a strfry relay
 - Shows summary counters for the current relay database state.
 - Reads relay Prometheus metrics from `/metrics` when available.
 - Reviews events using `strfry scan` with Nostr filters.
-- Deletes events by pubkey, raw filter, selected event IDs, or age.
+- Deletes events by pubkey, kind, raw filter, selected event IDs, or age.
 - Purges spam by scanning events, matching content locally, then deleting the matching IDs in batches.
 - Executes all destructive operations through the live Dockerized relay instead of touching LMDB files directly.
 
@@ -97,6 +97,16 @@ The backend runs:
 
 ```text
 strfry delete --filter='{"authors":[...]}'
+```
+
+### Delete by kinds
+
+Use this to remove all events for one or more event kinds.
+
+The backend runs:
+
+```text
+strfry delete --filter='{"kinds":[1,3,10002]}'
 ```
 
 ### Purge spam by content

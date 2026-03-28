@@ -268,6 +268,20 @@ async function deleteByAuthors(authors, dryRun) {
   return deleteByFilter({ authors: cleanedAuthors }, dryRun);
 }
 
+async function deleteByKinds(kinds, dryRun) {
+  const cleanedKinds = (kinds || []).map(function (value) {
+    return Number(value);
+  }).filter(function (value) {
+    return Number.isInteger(value) && value >= 0;
+  });
+
+  if (!cleanedKinds.length) {
+    throw new Error('At least one event kind is required');
+  }
+
+  return deleteByFilter({ kinds: cleanedKinds }, dryRun);
+}
+
 async function deleteByEventIds(ids, dryRun) {
   const cleanedIds = (ids || []).map(function (value) {
     return String(value).trim();
@@ -388,6 +402,7 @@ module.exports = {
   scanEvents: scanEvents,
   deleteByAge: deleteByAge,
   deleteByAuthors: deleteByAuthors,
+  deleteByKinds: deleteByKinds,
   deleteByEventIds: deleteByEventIds,
   deleteByFilter: deleteByFilter,
   deleteMatchingContent: deleteMatchingContent,

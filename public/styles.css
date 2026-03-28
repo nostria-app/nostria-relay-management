@@ -215,6 +215,12 @@ main {
   border-bottom: 1px dashed var(--line);
 }
 
+.top-divider {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px dashed var(--line);
+}
+
 .full-span {
   grid-column: 1 / -1;
 }

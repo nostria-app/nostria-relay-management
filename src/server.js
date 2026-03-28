@@ -98,6 +98,11 @@ app.post('/api/moderation/delete-by-authors', asyncRoute(async function (request
   response.json(result);
 }));
 
+app.post('/api/moderation/delete-by-kinds', asyncRoute(async function (request, response) {
+  const result = await relayService.deleteByKinds(request.body.kinds || [], parseBoolean(request.body.dryRun, true));
+  response.json(result);
+}));
+
 app.post('/api/moderation/delete-by-filter', asyncRoute(async function (request, response) {
   const result = await relayService.deleteByFilter(request.body.filter || {}, parseBoolean(request.body.dryRun, true));
   response.json(result);
