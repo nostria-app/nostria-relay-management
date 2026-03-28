@@ -13,10 +13,13 @@ const confirmationFoundCount = document.getElementById('confirmationFoundCount')
 const confirmationDeleteCount = document.getElementById('confirmationDeleteCount');
 const confirmCancelButton = document.getElementById('confirmCancelButton');
 const confirmProceedButton = document.getElementById('confirmProceedButton');
+const relaySelector = document.getElementById('relaySelector');
 
 let currentEvents = [];
 let selectedEventIds = {};
 let pendingConfirmationResolve = null;
+let availableRelays = [];
+let selectedRelayId = null;
 
 function summarizeValue(value, depth) {
   const currentDepth = depth || 0;
@@ -91,6 +94,16 @@ async function apiRequest(url, options) {
   }
 
   return data;
+}
+
+function withRelayQuery(url) {
+  const target = new URL(url, window.location.origin);
+
+  if (selectedRelayId) {
+    target.searchParams.set('relayId', selectedRelayId);
+  }
+
+  return target.pathname + target.search;
 }
 
 function escapeHtml(value) {
@@ -259,13 +272,15 @@ function readNumberList(value) {
 }
 
 async function refreshHealth() {
-  const health = await apiRequest('/api/health');
+  const health = await apiRequest(withRelayQuery('/api/health'));
   document.getElementById('healthStatus').textContent = health.ok ? 'Backend connected' : 'Backend unavailable';
   document.getElementById('nodeVersion').textContent = health.nodeVersion;
+  document.getElementById('relayName').textContent = health.relayName;
+  document.getElementById('relayContainer').textContent = health.relayContainer;
 }
 
 async function refreshSummary() {
-  const summary = await apiRequest('/api/summary');
+  const summary = await apiRequest(withRelayQuery('/api/summary'));
   renderSummary(summary);
   logActivity('Summary refreshed', summary);
 }
@@ -276,6 +291,10 @@ async function loadEvents(event) {
   }
 
   const params = new URLSearchParams(new FormData(reviewForm));
+  if (selectedRelayId) {
+    params.set('relayId', selectedRelayId);
+  }
+
   const data = await apiRequest('/api/events?' + params.toString());
   renderEvents(data.events, 'Loaded ' + data.total + ' events with filter ' + JSON.stringify(data.filter));
   logActivity('Events loaded', data);
@@ -283,12 +302,18 @@ async function loadEvents(event) {
 
 async function postJson(url, payload) {
   const options = arguments[2] || {};
+  const requestBody = Object.assign({}, payload);
+
+  if (selectedRelayId) {
+    requestBody.relayId = selectedRelayId;
+  }
+
   const data = await apiRequest(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(requestBody)
   });
 
   logActivity(options.logTitle || ('Executed ' + url), data);
@@ -470,6 +495,33 @@ function wireForms() {
       closeConfirmationDialog(false);
     }
   });
+  relaySelector.addEventListener('change', async function () {
+    selectedRelayId = relaySelector.value;
+    renderEvents([], 'Switching relay...');
+    await refreshHealth();
+    await refreshSummary();
+  });
+}
+
+function renderRelayOptions(relays, defaultRelayId) {
+  availableRelays = relays.slice();
+
+  if (!selectedRelayId) {
+    selectedRelayId = defaultRelayId || (relays[0] && relays[0].id) || null;
+  }
+
+  relaySelector.innerHTML = relays.map(function (relay) {
+    return '<option value="' + escapeHtml(relay.id) + '">' + escapeHtml(relay.name) + '</option>';
+  }).join('');
+
+  if (selectedRelayId) {
+    relaySelector.value = selectedRelayId;
+  }
+}
+
+async function loadRelays() {
+  const data = await apiRequest('/api/relays');
+  renderRelayOptions(data.relays || [], data.defaultRelayId);
 }
 
 async function bootstrap() {
@@ -477,6 +529,7 @@ async function bootstrap() {
   wireForms();
 
   try {
+    await loadRelays();
     await refreshHealth();
     await refreshSummary();
   } catch (error) {

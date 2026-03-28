@@ -38,7 +38,8 @@ body.dialog-open {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -131,6 +132,12 @@ main,
 .hero-metrics {
   display: grid;
   gap: 16px;
+}
+
+.relay-selector-shell {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .hero-metrics strong {
@@ -240,7 +247,8 @@ label span {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   padding: 13px 14px;
   border-radius: 16px;

@@ -10,6 +10,7 @@ Local web dashboard for reviewing and moderating events stored in a strfry relay
 - Deletes events by pubkey, kind, raw filter, selected event IDs, or age.
 - Purges spam by scanning events, matching content locally, then deleting the matching IDs in batches.
 - Executes all destructive operations through the live Dockerized relay instead of touching LMDB files directly.
+- Supports selecting among multiple running relays on the Docker host.
 
 ## Current relay defaults
 
@@ -22,6 +23,8 @@ The app currently targets this environment by default:
 - Dashboard URL: `http://127.0.0.1:3095`
 
 These are all configurable with environment variables.
+
+When multiple strfry containers are running, the dashboard will discover them from `docker ps` and let you switch relays from the UI.
 
 ## Requirements
 
@@ -61,6 +64,7 @@ Environment variables:
 - `STRFRY_CONTAINER`: Docker container name
 - `STRFRY_BINARY_PATH`: path to the strfry binary inside the container
 - `STRFRY_CONFIG_PATH`: strfry config path inside the container
+- `RELAYS_JSON`: optional JSON array of relay definitions if you want to pin friendly names or non-default metrics URLs
 - `DEFAULT_REVIEW_LIMIT`: default review query limit, default `100`
 - `STRFRY_SCAN_TIMEOUT_MS`: scan timeout, default `15000`
 - `STRFRY_DELETE_TIMEOUT_MS`: delete timeout, default `30000`

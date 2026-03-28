@@ -2,6 +2,7 @@ const path = require('path');
 const express = require('express');
 const config = require('./config');
 const relayService = require('./services/relayService');
+const relayRegistry = require('./relayRegistry');
 
 const app = express();
 
@@ -73,58 +74,90 @@ function buildReviewFilter(query) {
   return filter;
 }
 
-app.get('/api/health', function (request, response) {
+async function resolveRelay(request) {
+  const relayId = (request.query && request.query.relayId) || (request.body && request.body.relayId);
+  const relay = await relayRegistry.getRelayById(relayId);
+
+  if (!relay) {
+    const error = new Error('Unknown relay selection');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return relay;
+}
+
+app.get('/api/relays', asyncRoute(async function (request, response) {
+  const relays = await relayRegistry.listRelays();
+  response.json({
+    relays: relays,
+    defaultRelayId: relays.length ? relays[0].id : null
+  });
+}));
+
+app.get('/api/health', asyncRoute(async function (request, response) {
+  const relay = await resolveRelay(request);
   response.json({
     ok: true,
-    relayName: config.relayName,
-    relayContainer: config.relayContainer,
+    relayId: relay.id,
+    relayName: relay.name,
+    relayContainer: relay.container,
+    relayMetricsUrl: relay.metricsUrl,
     nodeVersion: process.version
   });
-});
+}));
 
 app.get('/api/summary', asyncRoute(async function (request, response) {
-  const summary = await relayService.getSummary();
+  const relay = await resolveRelay(request);
+  const summary = await relayService.getSummary(relay);
   response.json(summary);
 }));
 
 app.get('/api/events', asyncRoute(async function (request, response) {
+  const relay = await resolveRelay(request);
   const filter = buildReviewFilter(request.query);
-  const result = await relayService.scanEvents(filter, { limit: filter.limit || config.reviewLimit });
+  const result = await relayService.scanEvents(relay, filter, { limit: filter.limit || config.reviewLimit });
   response.json(result);
 }));
 
 app.post('/api/moderation/delete-by-authors', asyncRoute(async function (request, response) {
-  const result = await relayService.deleteByAuthors(request.body.authors, parseBoolean(request.body.dryRun, true));
+  const relay = await resolveRelay(request);
+  const result = await relayService.deleteByAuthors(relay, request.body.authors, parseBoolean(request.body.dryRun, true));
   response.json(result);
 }));
 
 app.post('/api/moderation/delete-by-kinds', asyncRoute(async function (request, response) {
-  const result = await relayService.deleteByKinds(request.body.kinds || [], parseBoolean(request.body.dryRun, true));
+  const relay = await resolveRelay(request);
+  const result = await relayService.deleteByKinds(relay, request.body.kinds || [], parseBoolean(request.body.dryRun, true));
   response.json(result);
 }));
 
 app.post('/api/moderation/delete-by-filter', asyncRoute(async function (request, response) {
-  const result = await relayService.deleteByFilter(request.body.filter || {}, parseBoolean(request.body.dryRun, true));
+  const relay = await resolveRelay(request);
+  const result = await relayService.deleteByFilter(relay, request.body.filter || {}, parseBoolean(request.body.dryRun, true));
   response.json(result);
 }));
 
 app.post('/api/moderation/delete-by-age', asyncRoute(async function (request, response) {
+  const relay = await resolveRelay(request);
   if (!request.body.age) {
     response.status(400).json({ error: 'age is required' });
     return;
   }
 
-  const result = await relayService.deleteByAge(String(request.body.age), parseBoolean(request.body.dryRun, true));
+  const result = await relayService.deleteByAge(relay, String(request.body.age), parseBoolean(request.body.dryRun, true));
   response.json(result);
 }));
 
 app.post('/api/moderation/delete-events', asyncRoute(async function (request, response) {
-  const result = await relayService.deleteByEventIds(request.body.ids || [], parseBoolean(request.body.dryRun, true));
+  const relay = await resolveRelay(request);
+  const result = await relayService.deleteByEventIds(relay, request.body.ids || [], parseBoolean(request.body.dryRun, true));
   response.json(result);
 }));
 
 app.post('/api/moderation/delete-matching-content', asyncRoute(async function (request, response) {
-  const result = await relayService.deleteMatchingContent({
+  const relay = await resolveRelay(request);
+  const result = await relayService.deleteMatchingContent(relay, {
     query: request.body.query,
     useRegex: parseBoolean(request.body.useRegex, false),
     dryRun: parseBoolean(request.body.dryRun, true),

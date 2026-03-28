@@ -6,16 +6,16 @@ const config = require('../config');
 
 const execFileAsync = promisify(execFile);
 
-function buildDockerArgs(strfryArgs) {
+function buildDockerArgs(relay, strfryArgs) {
   return [
     'exec',
-    config.relayContainer,
+    relay.container,
     'sh',
     '-lc',
     [
-      quoteForShell(config.relayBinaryPath),
+      quoteForShell(relay.binaryPath),
       '--config',
-      quoteForShell(config.relayConfigPath)
+      quoteForShell(relay.configPath)
     ].concat(strfryArgs.map(quoteForShell)).join(' ')
   ];
 }
@@ -24,8 +24,8 @@ function quoteForShell(value) {
   return "'" + String(value).replace(/'/g, "'\\''") + "'";
 }
 
-async function runStrfry(strfryArgs, timeoutMs) {
-  const dockerArgs = buildDockerArgs(strfryArgs);
+async function runStrfry(relay, strfryArgs, timeoutMs) {
+  const dockerArgs = buildDockerArgs(relay, strfryArgs);
 
   try {
     const result = await execFileAsync('docker', dockerArgs, {
@@ -211,9 +211,9 @@ function parseAgeToSeconds(age) {
   return total;
 }
 
-async function countEvents(filter) {
+async function countEvents(relay, filter) {
   const normalized = normalizeFilter(filter);
-  const result = await runStrfry(['scan', '--count', JSON.stringify(normalized)], config.scanTimeoutMs);
+  const result = await runStrfry(relay, ['scan', '--count', JSON.stringify(normalized)], config.scanTimeoutMs);
 
   return {
     count: parseCount(result.stdout),
@@ -223,9 +223,9 @@ async function countEvents(filter) {
   };
 }
 
-async function scanEvents(filter, options) {
+async function scanEvents(relay, filter, options) {
   const normalized = normalizeFilter(filter, (options && options.limit) || config.reviewLimit);
-  const result = await runStrfry(['scan', JSON.stringify(normalized)], config.scanTimeoutMs);
+  const result = await runStrfry(relay, ['scan', JSON.stringify(normalized)], config.scanTimeoutMs);
   const events = parseEvents(result.stdout);
 
   return {
@@ -237,7 +237,7 @@ async function scanEvents(filter, options) {
   };
 }
 
-async function deleteByFilter(filter, dryRun) {
+async function deleteByFilter(relay, filter, dryRun) {
   const normalized = normalizeFilter(filter);
   const args = ['delete', '--filter=' + JSON.stringify(normalized)];
 
@@ -245,7 +245,7 @@ async function deleteByFilter(filter, dryRun) {
     args.push('--dry-run');
   }
 
-  const result = await runStrfry(args, config.deleteTimeoutMs);
+  const result = await runStrfry(relay, args, config.deleteTimeoutMs);
 
   return buildDeleteResponse(result, {
     dryRun: dryRun,
@@ -255,7 +255,7 @@ async function deleteByFilter(filter, dryRun) {
   });
 }
 
-async function deleteByAge(age, dryRun) {
+async function deleteByAge(relay, age, dryRun) {
   const ageSeconds = parseAgeToSeconds(age);
   const args = ['delete', '--age=' + ageSeconds];
 
@@ -263,7 +263,7 @@ async function deleteByAge(age, dryRun) {
     args.push('--dry-run');
   }
 
-  const result = await runStrfry(args, config.deleteTimeoutMs);
+  const result = await runStrfry(relay, args, config.deleteTimeoutMs);
 
   return buildDeleteResponse(result, {
     dryRun: dryRun,
@@ -274,7 +274,7 @@ async function deleteByAge(age, dryRun) {
   });
 }
 
-async function deleteByAuthors(authors, dryRun) {
+async function deleteByAuthors(relay, authors, dryRun) {
   const cleanedAuthors = (authors || []).map(function (value) {
     return String(value).trim();
   }).filter(Boolean);
@@ -283,10 +283,10 @@ async function deleteByAuthors(authors, dryRun) {
     throw new Error('At least one author pubkey is required');
   }
 
-  return deleteByFilter({ authors: cleanedAuthors }, dryRun);
+  return deleteByFilter(relay, { authors: cleanedAuthors }, dryRun);
 }
 
-async function deleteByKinds(kinds, dryRun) {
+async function deleteByKinds(relay, kinds, dryRun) {
   const cleanedKinds = (kinds || []).map(function (value) {
     return Number(value);
   }).filter(function (value) {
@@ -297,10 +297,10 @@ async function deleteByKinds(kinds, dryRun) {
     throw new Error('At least one event kind is required');
   }
 
-  return deleteByFilter({ kinds: cleanedKinds }, dryRun);
+  return deleteByFilter(relay, { kinds: cleanedKinds }, dryRun);
 }
 
-async function deleteByEventIds(ids, dryRun) {
+async function deleteByEventIds(relay, ids, dryRun) {
   const cleanedIds = (ids || []).map(function (value) {
     return String(value).trim();
   }).filter(Boolean);
@@ -316,7 +316,7 @@ async function deleteByEventIds(ids, dryRun) {
 
   for (let index = 0; index < chunks.length; index += 1) {
     const chunk = chunks[index];
-    const result = await deleteByFilter({ ids: chunk }, dryRun);
+    const result = await deleteByFilter(relay, { ids: chunk }, dryRun);
     results.push(result);
     requestedDeleteCount += chunk.length;
     matchedCount += result.matchedCount || 0;
@@ -334,7 +334,7 @@ async function deleteByEventIds(ids, dryRun) {
   };
 }
 
-async function deleteMatchingContent(options) {
+async function deleteMatchingContent(relay, options) {
   const query = String(options.query || '').trim();
   const isRegex = !!options.useRegex;
   const dryRun = !!options.dryRun;
@@ -350,7 +350,7 @@ async function deleteMatchingContent(options) {
     throw new Error('A content query is required');
   }
 
-  const scanResult = await scanEvents(filter, { limit: filter.limit || 500 });
+  const scanResult = await scanEvents(relay, filter, { limit: filter.limit || 500 });
   const matcher = isRegex ? new RegExp(query, 'i') : null;
   const matchedEvents = scanResult.events.filter(function (event) {
     const content = String(event.content || '');
@@ -359,7 +359,7 @@ async function deleteMatchingContent(options) {
   const ids = matchedEvents.map(function (event) {
     return event.id;
   });
-  const deleteResult = ids.length ? await deleteByEventIds(ids, dryRun) : {
+  const deleteResult = ids.length ? await deleteByEventIds(relay, ids, dryRun) : {
     totalIds: 0,
     batchCount: 0,
     dryRun: dryRun,
@@ -382,7 +382,7 @@ async function deleteMatchingContent(options) {
   };
 }
 
-async function getSummary() {
+async function getSummary(relay) {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const dayAgoSeconds = nowSeconds - (24 * 60 * 60);
   const weekAgoSeconds = nowSeconds - (7 * 24 * 60 * 60);
@@ -396,11 +396,11 @@ async function getSummary() {
     ['last24h', { since: dayAgoSeconds }],
     ['last7d', { since: weekAgoSeconds }]
   ].map(async function (entry) {
-    const result = await countEvents(entry[1]);
+    const result = await countEvents(relay, entry[1]);
     return [entry[0], result.count];
   });
 
-  const metricsJob = fetchText(config.relayMetricsUrl)
+  const metricsJob = fetchText(relay.metricsUrl)
     .then(parseMetricsText)
     .catch(function (error) {
       return { error: error.message };
@@ -414,8 +414,10 @@ async function getSummary() {
   }, {});
 
   return {
-    relayName: config.relayName,
-    relayContainer: config.relayContainer,
+    relayId: relay.id,
+    relayName: relay.name,
+    relayContainer: relay.container,
+    relayMetricsUrl: relay.metricsUrl,
     counts: counts,
     metrics: metrics,
     generatedAt: new Date().toISOString()
