@@ -395,6 +395,10 @@ code {
   z-index: 20;
 }
 
+.dialog-backdrop[hidden] {
+  display: none;
+}
+
 .dialog-card {
   width: min(540px, 100%);
   background: var(--surface-strong);
