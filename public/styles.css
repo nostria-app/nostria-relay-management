@@ -29,6 +29,7 @@ body {
     linear-gradient(180deg, #f7f0e5 0%, #efe7db 100%);
   color: var(--ink);
   font-family: 'Space Grotesk', 'Avenir Next', sans-serif;
+  overflow-x: hidden;
 }
 
 button,
@@ -41,6 +42,21 @@ textarea {
   width: min(1400px, calc(100% - 32px));
   margin: 0 auto;
   padding: 32px 0 64px;
+}
+
+.page-shell,
+main,
+.hero,
+.panel,
+.hero-panel,
+.summary-grid,
+.metrics-grid,
+.tool-grid,
+.summary-card,
+.metric-card,
+.section-heading,
+.table-shell {
+  min-width: 0;
 }
 
 .hero {
@@ -173,6 +189,15 @@ main {
   color: var(--muted);
 }
 
+.metric-card .mono {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -269,14 +294,17 @@ button:disabled {
 
 .table-shell {
   overflow: auto;
+  max-height: min(68vh, 860px);
   border-radius: 18px;
   border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.48);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 960px;
+  min-width: 780px;
+  table-layout: fixed;
 }
 
 th,
@@ -288,6 +316,9 @@ td {
 }
 
 th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.76rem;
   text-transform: uppercase;
@@ -309,8 +340,13 @@ code {
 .content-preview,
 .event-id,
 .author-key {
-  max-width: 280px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.content-preview {
+  line-height: 1.45;
 }
 
 .pill {
@@ -332,6 +368,9 @@ code {
   background: #1d1b19;
   color: #d8f0eb;
   border-radius: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 @keyframes reveal {
@@ -351,6 +390,11 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .page-shell {
     width: min(100% - 20px, 1400px);
     padding-top: 20px;
@@ -364,5 +408,38 @@ code {
 
   .hero h1 {
     max-width: none;
+  }
+
+  .table-shell {
+    max-height: 55vh;
+  }
+
+  table {
+    min-width: 680px;
+  }
+}
+
+@media (max-width: 640px) {
+  .form-grid,
+  .tool-grid,
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .results-toolbar {
+    font-size: 0.92rem;
+  }
+
+  table {
+    min-width: 620px;
+  }
+
+  th,
+  td {
+    padding: 12px 10px;
   }
 }

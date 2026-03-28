@@ -10,14 +10,68 @@ const deleteSelectedButton = document.getElementById('deleteSelectedButton');
 let currentEvents = [];
 let selectedEventIds = {};
 
+function summarizeValue(value, depth) {
+  const currentDepth = depth || 0;
+
+  if (value == null) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return value.length > 280 ? value.slice(0, 277) + '...' : value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    if (currentDepth >= 2) {
+      return '[Array(' + value.length + ')]';
+    }
+
+    return value.slice(0, 5).map(function (item) {
+      return summarizeValue(item, currentDepth + 1);
+    }).concat(value.length > 5 ? ['... +' + (value.length - 5) + ' more'] : []);
+  }
+
+  if (typeof value === 'object') {
+    if (currentDepth >= 2) {
+      return '[Object]';
+    }
+
+    return Object.keys(value).slice(0, 10).reduce(function (accumulator, key) {
+      if (key === 'events' && Array.isArray(value[key])) {
+        accumulator.eventCount = value[key].length;
+        accumulator.eventSample = value[key].slice(0, 2).map(function (event) {
+          return {
+            id: event.id,
+            kind: event.kind,
+            pubkey: event.pubkey,
+            created_at: event.created_at,
+            content: summarizeContent(event.content)
+          };
+        });
+        return accumulator;
+      }
+
+      accumulator[key] = summarizeValue(value[key], currentDepth + 1);
+      return accumulator;
+    }, {});
+  }
+
+  return String(value);
+}
+
 function logActivity(title, payload) {
   const timestamp = new Date().toISOString();
+  const summarizedPayload = summarizeValue(payload, 0);
   const output = [
     '[' + timestamp + '] ' + title,
-    JSON.stringify(payload, null, 2)
+    JSON.stringify(summarizedPayload, null, 2)
   ].join('\n');
 
-  activityLog.textContent = output + '\n\n' + activityLog.textContent;
+  activityLog.textContent = (output + '\n\n' + activityLog.textContent).slice(0, 20000);
 }
 
 async function apiRequest(url, options) {
