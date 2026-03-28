@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nostria Relay Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Nostria Relay Management</p>
+        <h1>Operate strfry with a review-first moderation dashboard.</h1>
+        <p class="hero-copy">Inspect the relay state, review stored events, purge abusive content, and run precise cleanup actions against the live relay container.</p>
+      </div>
+      <div class="hero-panel">
+        <div class="status-line">
+          <span class="status-dot"></span>
+          <span id="healthStatus">Connecting to relay backend</span>
+        </div>
+        <div class="hero-metrics">
+          <div>
+            <span class="label">Relay</span>
+            <strong id="relayName">-</strong>
+          </div>
+          <div>
+            <span class="label">Container</span>
+            <strong id="relayContainer">-</strong>
+          </div>
+          <div>
+            <span class="label">Node Runtime</span>
+            <strong id="nodeVersion">-</strong>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel summary-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Summary</p>
+            <h2>Current relay database state</h2>
+          </div>
+          <button class="ghost-button" id="refreshSummaryButton" type="button">Refresh</button>
+        </div>
+        <div class="summary-grid" id="summaryGrid"></div>
+        <div class="metrics-grid" id="metricsGrid"></div>
+      </section>
+
+      <section class="panel review-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Review</p>
+            <h2>Inspect events before deleting them</h2>
+          </div>
+        </div>
+        <form id="reviewForm" class="form-grid">
+          <label>
+            <span>Authors</span>
+            <input type="text" name="authors" placeholder="comma-separated pubkeys">
+          </label>
+          <label>
+            <span>Kinds</span>
+            <input type="text" name="kinds" placeholder="1,0,3,10002">
+          </label>
+          <label>
+            <span>Event IDs</span>
+            <input type="text" name="ids" placeholder="optional explicit ids">
+          </label>
+          <label>
+            <span>Since</span>
+            <input type="number" name="since" placeholder="unix timestamp">
+          </label>
+          <label>
+            <span>Until</span>
+            <input type="number" name="until" placeholder="unix timestamp">
+          </label>
+          <label>
+            <span>Limit</span>
+            <input type="number" name="limit" value="100" min="1" max="1000">
+          </label>
+          <div class="form-actions full-span">
+            <button type="submit">Load Events</button>
+            <button id="deleteSelectedButton" type="button" class="danger-button" disabled>Delete Selected</button>
+          </div>
+        </form>
+        <div class="results-toolbar">
+          <p id="reviewResultMeta">No events loaded yet.</p>
+        </div>
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="selectAllEvents"></th>
+                <th>Created</th>
+                <th>Kind</th>
+                <th>Author</th>
+                <th>Event</th>
+                <th>Content</th>
+              </tr>
+            </thead>
+            <tbody id="eventsTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tool-grid">
+        <section class="panel moderation-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Moderation</p>
+              <h2>Purge by public key</h2>
+            </div>
+          </div>
+          <form id="authorsDeleteForm" class="stacked-form">
+            <label>
+              <span>Public keys</span>
+              <textarea name="authors" rows="5" placeholder="One pubkey per line or comma-separated"></textarea>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" name="dryRun" checked>
+              <span>Dry run first</span>
+            </label>
+            <button type="submit" class="danger-button">Delete By Authors</button>
+          </form>
+        </section>
+
+        <section class="panel moderation-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Moderation</p>
+              <h2>Purge spam by content</h2>
+            </div>
+          </div>
+          <form id="contentDeleteForm" class="stacked-form">
+            <label>
+              <span>Content query</span>
+              <input type="text" name="query" placeholder="telegram, airdrop, zap now">
+            </label>
+            <label>
+              <span>Optional kinds</span>
+              <input type="text" name="kinds" placeholder="1,30023">
+            </label>
+            <label>
+              <span>Scan limit</span>
+              <input type="number" name="limit" value="500" min="1" max="5000">
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" name="useRegex">
+              <span>Treat query as regex</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" name="dryRun" checked>
+              <span>Dry run first</span>
+            </label>
+            <button type="submit" class="danger-button">Delete Matching Content</button>
+          </form>
+        </section>
+
+        <section class="panel moderation-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Cleanup</p>
+              <h2>Age and raw filter actions</h2>
+            </div>
+          </div>
+          <form id="ageDeleteForm" class="stacked-form compact-form">
+            <label>
+              <span>Delete older than</span>
+              <input type="text" name="age" placeholder="30d or 12h">
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" name="dryRun" checked>
+              <span>Dry run first</span>
+            </label>
+            <button type="submit">Run Age Cleanup</button>
+          </form>
+          <form id="filterDeleteForm" class="stacked-form">
+            <label>
+              <span>Raw nostr filter JSON</span>
+              <textarea name="filter" rows="6" placeholder='{"authors":["pubkey"],"kinds":[1]}'></textarea>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" name="dryRun" checked>
+              <span>Dry run first</span>
+            </label>
+            <button type="submit" class="danger-button">Delete By Raw Filter</button>
+          </form>
+        </section>
+      </section>
+
+      <section class="panel activity-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Execution</p>
+            <h2>Command responses</h2>
+          </div>
+        </div>
+        <pre id="activityLog">Waiting for first action.</pre>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "nostria-relay-management",
+  "version": "0.1.0",
+  "description": "Local dashboard for reviewing and moderating events on a strfry relay.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "4.21.2"
+  }
+}
