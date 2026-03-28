@@ -137,6 +137,7 @@ Use the raw JSON field when you want direct control over the filter passed to `s
 ## Safety notes
 
 - The destructive forms default to `dry run` enabled.
+- When `dry run` is disabled, the UI first runs a preview and asks for confirmation with the number of matched events and the number that will be deleted.
 - Selected-event deletion from the review table runs live deletion, so confirm the current result set first.
 - Very broad content scans can be expensive. Start with kind, author, or time constraints when possible.
 

@@ -6,9 +6,17 @@ const eventsTableBody = document.getElementById('eventsTableBody');
 const reviewResultMeta = document.getElementById('reviewResultMeta');
 const selectAllEvents = document.getElementById('selectAllEvents');
 const deleteSelectedButton = document.getElementById('deleteSelectedButton');
+const confirmationBackdrop = document.getElementById('confirmationBackdrop');
+const confirmationTitle = document.getElementById('confirmationTitle');
+const confirmationMessage = document.getElementById('confirmationMessage');
+const confirmationFoundCount = document.getElementById('confirmationFoundCount');
+const confirmationDeleteCount = document.getElementById('confirmationDeleteCount');
+const confirmCancelButton = document.getElementById('confirmCancelButton');
+const confirmProceedButton = document.getElementById('confirmProceedButton');
 
 let currentEvents = [];
 let selectedEventIds = {};
+let pendingConfirmationResolve = null;
 
 function summarizeValue(value, depth) {
   const currentDepth = depth || 0;
@@ -105,6 +113,57 @@ function unixToIso(value) {
   }
 
   return new Date(value * 1000).toISOString();
+}
+
+function formatCount(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function summarizeModerationCounts(result, fallbackCount) {
+  const foundCount = Number(
+    result.matchedCount != null ? result.matchedCount :
+    result.totalIds != null ? result.totalIds :
+    result.requestedDeleteCount != null ? result.requestedDeleteCount :
+    fallbackCount || 0
+  );
+  const deleteCount = Number(
+    result.wouldDeleteCount != null ? result.wouldDeleteCount :
+    result.deletedCount != null && result.deletedCount > 0 ? result.deletedCount :
+    result.delete && result.delete.requestedDeleteCount != null ? result.delete.requestedDeleteCount :
+    result.requestedDeleteCount != null ? result.requestedDeleteCount :
+    foundCount
+  );
+
+  return {
+    foundCount: foundCount,
+    deleteCount: deleteCount
+  };
+}
+
+function closeConfirmationDialog(answer) {
+  if (pendingConfirmationResolve) {
+    pendingConfirmationResolve(answer);
+    pendingConfirmationResolve = null;
+  }
+
+  confirmationBackdrop.hidden = true;
+  document.body.classList.remove('dialog-open');
+}
+
+function openConfirmationDialog(options) {
+  confirmationTitle.textContent = options.title;
+  confirmationMessage.textContent = options.message;
+  confirmationFoundCount.textContent = formatCount(options.foundCount);
+  confirmationDeleteCount.textContent = formatCount(options.deleteCount);
+  confirmProceedButton.textContent = options.confirmLabel || 'Yes, delete';
+  confirmProceedButton.disabled = !!options.disableConfirm;
+  confirmCancelButton.textContent = options.cancelLabel || 'Cancel';
+  confirmationBackdrop.hidden = false;
+  document.body.classList.add('dialog-open');
+
+  return new Promise(function (resolve) {
+    pendingConfirmationResolve = resolve;
+  });
 }
 
 function renderSummary(summary) {
@@ -223,6 +282,7 @@ async function loadEvents(event) {
 }
 
 async function postJson(url, payload) {
+  const options = arguments[2] || {};
   const data = await apiRequest(url, {
     method: 'POST',
     headers: {
@@ -231,33 +291,82 @@ async function postJson(url, payload) {
     body: JSON.stringify(payload)
   });
 
-  logActivity('Executed ' + url, data);
-  await refreshSummary();
+  logActivity(options.logTitle || ('Executed ' + url), data);
+
+  if (options.refreshSummary !== false) {
+    await refreshSummary();
+  }
+
   return data;
+}
+
+async function runModerationRequest(options) {
+  const previewPayload = Object.assign({}, options.payload, { dryRun: true });
+  const previewResult = await postJson(options.url, previewPayload, {
+    refreshSummary: false,
+    logTitle: 'Preview ' + options.label
+  });
+
+  if (options.payload.dryRun) {
+    return previewResult;
+  }
+
+  const counts = summarizeModerationCounts(previewResult, options.fallbackCount);
+  const hasMatches = counts.deleteCount > 0;
+  const confirmed = await openConfirmationDialog({
+    title: hasMatches ? 'Confirm deletion' : 'No matching events found',
+    message: hasMatches
+      ? 'This action will permanently remove the matched events from the relay. Review the counts before continuing.'
+      : 'The preview found no matching events, so nothing will be deleted.',
+    foundCount: counts.foundCount,
+    deleteCount: counts.deleteCount,
+    confirmLabel: hasMatches ? 'Yes, delete' : 'Nothing to delete',
+    cancelLabel: hasMatches ? 'Cancel' : 'Close',
+    disableConfirm: !hasMatches
+  });
+
+  if (!confirmed || !hasMatches) {
+    return previewResult;
+  }
+
+  return postJson(options.url, Object.assign({}, options.payload, { dryRun: false }), {
+    logTitle: 'Executed ' + options.label
+  });
 }
 
 async function handleAuthorsDelete(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
-  await postJson('/api/moderation/delete-by-authors', {
+  await runModerationRequest({
+    url: '/api/moderation/delete-by-authors',
+    label: 'delete by authors',
+    payload: {
     authors: readTextareaList(formData.get('authors')),
     dryRun: formData.get('dryRun') === 'on'
+    }
   });
 }
 
 async function handleKindsDelete(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
-  await postJson('/api/moderation/delete-by-kinds', {
+  await runModerationRequest({
+    url: '/api/moderation/delete-by-kinds',
+    label: 'delete by kinds',
+    payload: {
     kinds: readNumberList(formData.get('kinds')),
     dryRun: formData.get('dryRun') === 'on'
+    }
   });
 }
 
 async function handleContentDelete(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
-  await postJson('/api/moderation/delete-matching-content', {
+  await runModerationRequest({
+    url: '/api/moderation/delete-matching-content',
+    label: 'delete matching content',
+    payload: {
     query: formData.get('query'),
     kinds: readTextareaList(formData.get('kinds')).map(function (value) {
       return Number(value);
@@ -267,24 +376,33 @@ async function handleContentDelete(event) {
     limit: Number(formData.get('limit')),
     useRegex: formData.get('useRegex') === 'on',
     dryRun: formData.get('dryRun') === 'on'
+    }
   });
 }
 
 async function handleAgeDelete(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
-  await postJson('/api/moderation/delete-by-age', {
+  await runModerationRequest({
+    url: '/api/moderation/delete-by-age',
+    label: 'delete by age',
+    payload: {
     age: formData.get('age'),
     dryRun: formData.get('dryRun') === 'on'
+    }
   });
 }
 
 async function handleFilterDelete(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
-  await postJson('/api/moderation/delete-by-filter', {
+  await runModerationRequest({
+    url: '/api/moderation/delete-by-filter',
+    label: 'delete by raw filter',
+    payload: {
     filter: JSON.parse(formData.get('filter')),
     dryRun: formData.get('dryRun') === 'on'
+    }
   });
 }
 
@@ -295,11 +413,19 @@ async function handleDeleteSelected() {
     return;
   }
 
-  await postJson('/api/moderation/delete-events', {
-    ids: ids,
-    dryRun: false
+  const result = await runModerationRequest({
+    url: '/api/moderation/delete-events',
+    label: 'delete selected events',
+    payload: {
+      ids: ids,
+      dryRun: false
+    },
+    fallbackCount: ids.length
   });
-  await loadEvents();
+
+  if (result && result.dryRun === false) {
+    await loadEvents();
+  }
 }
 
 function bindEventSelection() {
@@ -331,6 +457,19 @@ function wireForms() {
   document.getElementById('filterDeleteForm').addEventListener('submit', handleFilterDelete);
   document.getElementById('refreshSummaryButton').addEventListener('click', refreshSummary);
   deleteSelectedButton.addEventListener('click', handleDeleteSelected);
+  confirmCancelButton.addEventListener('click', function () {
+    closeConfirmationDialog(false);
+  });
+  confirmProceedButton.addEventListener('click', function () {
+    if (!confirmProceedButton.disabled) {
+      closeConfirmationDialog(true);
+    }
+  });
+  confirmationBackdrop.addEventListener('click', function (event) {
+    if (event.target === confirmationBackdrop) {
+      closeConfirmationDialog(false);
+    }
+  });
 }
 
 async function bootstrap() {

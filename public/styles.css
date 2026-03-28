@@ -32,6 +32,10 @@ body {
   overflow-x: hidden;
 }
 
+body.dialog-open {
+  overflow: hidden;
+}
+
 button,
 input,
 textarea {
@@ -379,6 +383,70 @@ code {
   word-break: break-word;
 }
 
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(21, 15, 10, 0.45);
+  backdrop-filter: blur(8px);
+  z-index: 20;
+}
+
+.dialog-card {
+  width: min(540px, 100%);
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.dialog-copy {
+  margin: 12px 0 18px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.confirmation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.confirmation-card {
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.confirmation-card span {
+  display: block;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.confirmation-card strong {
+  display: block;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.danger-card {
+  background: var(--danger-soft);
+  border-color: rgba(162, 49, 38, 0.2);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 @keyframes reveal {
   from {
     opacity: 0;
@@ -447,5 +515,17 @@ code {
   th,
   td {
     padding: 12px 10px;
+  }
+
+  .confirmation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .dialog-actions button {
+    width: 100%;
   }
 }

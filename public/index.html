@@ -217,6 +217,28 @@
     </main>
   </div>
 
+  <div class="dialog-backdrop" id="confirmationBackdrop" hidden>
+    <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="confirmationTitle">
+      <p class="eyebrow">Confirmation</p>
+      <h2 id="confirmationTitle">Confirm deletion</h2>
+      <p class="dialog-copy" id="confirmationMessage">This action will permanently remove events from the relay.</p>
+      <div class="confirmation-grid">
+        <article class="confirmation-card">
+          <span>Events found</span>
+          <strong id="confirmationFoundCount">0</strong>
+        </article>
+        <article class="confirmation-card danger-card">
+          <span>Will be deleted</span>
+          <strong id="confirmationDeleteCount">0</strong>
+        </article>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="ghost-button" id="confirmCancelButton">Cancel</button>
+        <button type="button" class="danger-button" id="confirmProceedButton">Yes, delete</button>
+      </div>
+    </section>
+  </div>
+
   <script src="/app.js"></script>
 </body>
 </html>

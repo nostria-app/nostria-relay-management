@@ -82,6 +82,26 @@ function parseCount(stdout) {
   return Number.isFinite(value) ? value : 0;
 }
 
+function parseDeleteCount(output) {
+  const match = String(output || '').match(/(?:Would delete|Deleted)\s+(\d+)\s+events?/i);
+  return match ? Number(match[1]) : 0;
+}
+
+function buildDeleteResponse(result, details) {
+  const parsedCount = parseDeleteCount((result.stderr || '') + '\n' + (result.stdout || ''));
+  const dryRun = !!details.dryRun;
+
+  return Object.assign({
+    command: result.command,
+    dryRun: dryRun,
+    matchedCount: parsedCount,
+    wouldDeleteCount: dryRun ? parsedCount : 0,
+    deletedCount: dryRun ? 0 : parsedCount,
+    stdout: result.stdout,
+    stderr: result.stderr
+  }, details.extra || {});
+}
+
 function parseMetricsText(metricsText) {
   const counters = {
     clientMessages: {},
@@ -227,13 +247,12 @@ async function deleteByFilter(filter, dryRun) {
 
   const result = await runStrfry(args, config.deleteTimeoutMs);
 
-  return {
-    command: result.command,
-    filter: normalized,
-    dryRun: !!dryRun,
-    stdout: result.stdout,
-    stderr: result.stderr
-  };
+  return buildDeleteResponse(result, {
+    dryRun: dryRun,
+    extra: {
+      filter: normalized
+    }
+  });
 }
 
 async function deleteByAge(age, dryRun) {
@@ -246,14 +265,13 @@ async function deleteByAge(age, dryRun) {
 
   const result = await runStrfry(args, config.deleteTimeoutMs);
 
-  return {
-    command: result.command,
-    age: age,
-    ageSeconds: ageSeconds,
-    dryRun: !!dryRun,
-    stdout: result.stdout,
-    stderr: result.stderr
-  };
+  return buildDeleteResponse(result, {
+    dryRun: dryRun,
+    extra: {
+      age: age,
+      ageSeconds: ageSeconds
+    }
+  });
 }
 
 async function deleteByAuthors(authors, dryRun) {
@@ -293,21 +311,26 @@ async function deleteByEventIds(ids, dryRun) {
 
   const chunks = chunkArray(cleanedIds, 200);
   const results = [];
-  let deletedCount = 0;
+  let requestedDeleteCount = 0;
+  let matchedCount = 0;
 
   for (let index = 0; index < chunks.length; index += 1) {
     const chunk = chunks[index];
     const result = await deleteByFilter({ ids: chunk }, dryRun);
     results.push(result);
-    deletedCount += chunk.length;
+    requestedDeleteCount += chunk.length;
+    matchedCount += result.matchedCount || 0;
   }
 
   return {
     totalIds: cleanedIds.length,
     batchCount: results.length,
     dryRun: !!dryRun,
+    matchedCount: matchedCount,
+    wouldDeleteCount: dryRun ? matchedCount : 0,
+    deletedCount: dryRun ? 0 : matchedCount,
     results: results,
-    requestedDeleteCount: deletedCount
+    requestedDeleteCount: requestedDeleteCount
   };
 }
 
@@ -347,6 +370,8 @@ async function deleteMatchingContent(options) {
   return {
     matchedCount: matchedEvents.length,
     matchedIds: ids,
+    wouldDeleteCount: dryRun ? deleteResult.requestedDeleteCount : 0,
+    deletedCount: dryRun ? 0 : deleteResult.deletedCount,
     sample: matchedEvents.slice(0, 25),
     scan: {
       filter: scanResult.filter,
